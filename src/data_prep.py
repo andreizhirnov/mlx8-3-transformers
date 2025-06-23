@@ -46,7 +46,7 @@ def break_and_flatten(image, dims):
 ima_1, lab_1 = read_images_labels("data/archive/train-images.idx3-ubyte", "data/archive/train-labels.idx1-ubyte")
 ima_2, lab_2 = read_images_labels("data/archive/t10k-images.idx3-ubyte", "data/archive/t10k-labels.idx1-ubyte")
   
-ima = [break_and_flatten(recode_bw(im), (7,7)) for im in ima_1 + ima_2]
+ima = [break_and_flatten(recode_bw(im), (4,4)) for im in ima_1 + ima_2]
 images = np.stack(ima)
 labs = np.array(lab_1+lab_2)
 

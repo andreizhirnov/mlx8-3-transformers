@@ -15,43 +15,56 @@ labs = np.load("data/labs.npy")
 full_dataset = TensorDataset(torch.tensor(images), torch.tensor(labs))
 train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [0.9, 0.1])
  
-test = torch.tensor(images[0:2])
+testtt = torch.tensor(images[0:2])
 # model
 
 class Encodr(nn.Module):
     def __init__(self,  ext_dim, v_dim, kq_dim): 
        super().__init__()
        self.linear_v = nn.Linear(ext_dim, v_dim, bias=False)
-       self.linear_k = nn.Linear(ext_dim, kq_dim, bias=False)
-       self.linear_q = nn.Linear(ext_dim, kq_dim, bias=False)
+       self.linear_k = nn.Sequential(
+           nn.Linear(ext_dim, kq_dim, bias=False),
+           nn.LayerNorm(kq_dim)
+           )
+       self.linear_q = nn.Sequential(
+           nn.Linear(ext_dim, kq_dim, bias=False),
+           nn.LayerNorm(kq_dim)
+           )
        self.k_scaler = torch.tensor(kq_dim**0.5)
        self.softmax_a = nn.Softmax(dim = -1)
-       self.linear_h = nn.Linear(v_dim, ext_dim, bias=False)
-       
+       self.ff = nn.Sequential(
+           nn.Linear(v_dim, ext_dim),
+           nn.ReLU(),
+           nn.Linear(ext_dim, ext_dim)
+           )
+       self.ln0 = nn.LayerNorm(ext_dim)
+       self.ln1 = nn.LayerNorm(ext_dim)
+       self.dropout = nn.Dropout(0.1)
+ 
     def forward(self, emb):
        v = self.linear_v(emb)
        k = self.linear_k(emb)
        q = self.linear_q(emb) 
        a = q.matmul(k.transpose(-1,-2)) / self.k_scaler
-       h = self.softmax_a(a).matmul(v)
-       return self.linear_h(h)
-
-class Classificator(nn.Module):
-    def __init__(self,  in_dim, hidden_dim, v_dim, kq_dim, num_classes=10): 
+       h = self.ln0(self.dropout(self.softmax_a(a).matmul(v)) + emb)
+       return self.ln1(self.ff(h) + h)
+    
+class Classifier(nn.Module):
+    def __init__(self,  in_dim, seq_len, hidden_dim, v_dim, kq_dim, num_classes=10): 
        super().__init__()
        self.fc_start = nn.Linear(in_dim, hidden_dim)
+       self.positions = torch.arange(0, seq_len).unsqueeze(0)
+       self.pos_embedding = nn.Embedding(seq_len, hidden_dim)
        self.encoder0 = Encodr(hidden_dim, v_dim, kq_dim)
        self.encoder1 = Encodr(hidden_dim, v_dim, kq_dim)       
        self.fc_final = nn.Linear(hidden_dim, num_classes)
    
-    def forward(self, emb):
-        x = self.fc_start(emb)
+    def forward(self, emb): 
+        x = self.fc_start(emb) + self.pos_embedding(self.positions)
         x = self.encoder0(x)
         x = self.encoder1(x)
         x = self.fc_final(x.mean(dim=1))
         return x
-
-# a = model(test)
 
 def make(config):
     # Make the data 
@@ -59,7 +72,7 @@ def make(config):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=config['batch_size']) 
     
     # Make the model 
-    model = Classificator(config['emb_dim'], config['hidden_dim'], config['v_dim'], config['kq_dim'])
+    model = Classifier(config['emb_dim'], config['seq_len'], config['hidden_dim'], config['v_dim'], config['kq_dim'])
 
     # Make the loss and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -98,23 +111,24 @@ def test(model, test_loader, criterion):
     mean_loss = losses/len(test_loader)
     print(f'Average test loss, Loss: {mean_loss.item():.4f}') 
 
-
-
 config = dict(
     num_epochs=10,
     batch_size=256,
     learning_rate=0.01,
     emb_dim = images.shape[-1],
+    seq_len = images.shape[1],
     hidden_dim = 32,
     v_dim = 32,
     kq_dim = 20,
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     )
 
-
 # execution
 model, train_loader, test_loader, criterion, optimizer = make(config)  
 print(model)
+
+a = model(testtt)
+print(f"test data shape: {a.shape}")
 
 train(model, train_loader, criterion, optimizer, config)
 test(model, test_loader, criterion) 

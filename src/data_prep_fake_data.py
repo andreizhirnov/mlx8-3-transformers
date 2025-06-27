@@ -3,7 +3,7 @@ from src.data_prep_functions import load_MNIST, recode_bw, break_and_flatten
 
 np.random.seed(123)
 images, labs = load_MNIST()
-vocab = np.array([str(i) for i in range(10)] + ["<s>","<f>","<p>"])
+vocab = np.array([str(i) for i in range(10)] + ["<f>"] + ["<s>","<p>"])
 lookup = {w: i for i, w in enumerate(vocab)}
 
 
@@ -46,7 +46,7 @@ builder = Combiner(images, labs, lookup, pr_empty=0.2)
 
 nima = []
 nlabs = []
-for i in range(100_000):
+for i in range(50_000):
     im, l = builder.draw_seq()
     nima.append(recode_bw(im))
     nlabs.append(l)
@@ -55,5 +55,5 @@ nlabs = np.stack(nlabs)
 
 np.save(arr=nima, file="data/comb_images.npy")
 np.save(arr=nlabs, file="data/comb_labs.npy")
-np.save(arr=vocab, file="data/comb_labs.npy")
+np.save(arr=vocab, file="data/vocab.npy")
 

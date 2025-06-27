@@ -45,3 +45,17 @@ def break_and_flatten(image, dims):
                 chunk = temp
             flat.append(chunk.flatten())
     return np.stack(flat)
+
+def break_and_flatten_3D(images, patch_dim):
+    rdims = images.shape
+    template = np.zeros((rdims[0], patch_dim, patch_dim))
+    flat = []
+    for i in range(0, rdims[2], patch_dim):
+        for j in range(0, rdims[1], patch_dim):
+            chunk = images[:,j:j+patch_dim,i:i+patch_dim]
+            if chunk.shape != template.shape:
+                temp = template.copy()
+                temp[:,:chunk.shape[1],:chunk.shape[2]] = chunk
+                chunk = temp
+            flat.append(chunk.reshape(rdims[0], patch_dim**2)) 
+    return np.stack(flat, axis = 1)
